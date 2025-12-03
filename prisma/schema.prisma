@@ -1,0 +1,197 @@
+// prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                    String     @id @default(cuid())
+  email                 String     @unique
+  name                  String
+  password              String
+  role                  Role       @default(STAFF)
+  department            String?
+  avatar                String?
+  isActive              Boolean    @default(true)
+  emailVerified         DateTime?
+  lastLogin             DateTime?
+  
+  accounts              Account[]
+  sessions              Session[]
+  budgets               Budget[]    @relation("CreatedBy")
+  expenses              Expense[]   @relation("CreatedBy")
+  approvals             Expense[]   @relation("ApprovedBy")
+  auditLogs             AuditLog[]
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@map("users")
+}
+
+model Account {
+  id                    String     @id @default(cuid())
+  userId                String
+  type                  String
+  provider              String
+  providerAccountId     String
+  refresh_token         String?
+  access_token          String?
+  expires_at            Int?
+  token_type            String?
+  scope                 String?
+  id_token              String?
+  session_state         String?
+  
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id                    String     @id @default(cuid())
+  sessionToken          String     @unique
+  userId                String
+  expires               DateTime
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
+model Budget {
+  id                    String     @id @default(cuid())
+  title                 String
+  fiscalYear            String
+  department            String
+  proposedAmount        Float
+  allottedAmount        Float
+  description           String?
+  status                BudgetStatus @default(ACTIVE)
+  
+  createdBy             String
+  creator               User       @relation("CreatedBy", fields: [createdBy], references: [id])
+  
+  expenses              Expense[]
+  categories            BudgetCategory[]
+  auditLogs             AuditLog[]
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@index([department])
+  @@index([fiscalYear])
+  @@map("budgets")
+}
+
+model BudgetCategory {
+  id                    String     @id @default(cuid())
+  budgetId              String
+  categoryId            String
+  allocatedAmount       Float
+  spent                 Float      @default(0)
+  
+  budget                Budget     @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category              Category   @relation(fields: [categoryId], references: [id])
+  
+  @@unique([budgetId, categoryId])
+  @@map("budget_categories")
+}
+
+model Category {
+  id                    String     @id @default(cuid())
+  name                  String     @unique
+  description           String?
+  icon                  String?
+  color                 String?
+  isActive              Boolean    @default(true)
+  
+  budgetCategories      BudgetCategory[]
+  expenses              Expense[]
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@map("categories")
+}
+
+model Expense {
+  id                    String     @id @default(cuid())
+  budgetId              String
+  categoryId            String
+  vendorName            String
+  vendorEmail           String?
+  vendorPhone           String?
+  amount                Float
+  description           String
+  activityName          String
+  receiptUrl            String?
+  receiptPublicId       String?
+  transactionDate       DateTime
+  status                ExpenseStatus @default(PENDING)
+  approvalNotes         String?
+  
+  createdBy             String
+  creator               User       @relation("CreatedBy", fields: [createdBy], references: [id])
+  approvedBy            String?
+  approver              User?      @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  
+  budget                Budget     @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  category              Category   @relation(fields: [categoryId], references: [id])
+  
+  auditLogs             AuditLog[]
+  
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  
+  @@index([budgetId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("expenses")
+}
+
+model AuditLog {
+  id                    String     @id @default(cuid())
+  action                String
+  entityType            String
+  entityId              String
+  userId                String
+  changes               Json?
+  metadata              Json?
+  
+  user                  User       @relation(fields: [userId], references: [id])
+  budget                Budget?    @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  budgetId              String?
+  expense               Expense?   @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  expenseId             String?
+  
+  timestamp             DateTime    @default(now())
+  
+  @@index([entityType])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
+
+enum Role {
+  ADMIN
+  HOD
+  STAFF
+}
+
+enum BudgetStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
