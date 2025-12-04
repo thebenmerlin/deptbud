@@ -1,5 +1,4 @@
-import { v2 as cloudinary } from "cloudinary";
-import { Logger } from "./logger";
+import { v2 as cloudinary } from 'cloudinary';
 
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
@@ -7,50 +6,39 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-export async function uploadReceipt(
-  file: Buffer,
-  fileName: string,
-  folder: string = "budget-receipts"
-): Promise<{ url: string; publicId: string }> {
+export async function uploadReceipt(file: File): Promise<string> {
   try {
-    const result = await new Promise((resolve, reject) => {
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder,
-          resource_type: "auto",
-          public_id: `${folder}/${Date.now()}-${fileName}`,
+          folder: 'deptbud/receipts',
+          resource_type: 'auto',
+          max_file_size: 5000000,
+          allowed_formats: ['pdf', 'jpg', 'jpeg', 'png'],
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) reject(new Error(`Upload failed: ${error.message}`));
+          else resolve(result?.secure_url || '');
         }
       );
 
-      uploadStream.end(file);
+      uploadStream.on('error', (err) => reject(err));
+      uploadStream.end(buffer);
     });
-
-    const uploadResult = result as any;
-    Logger.info("Receipt uploaded successfully", {
-      publicId: uploadResult.public_id,
-      url: uploadResult.secure_url,
-    });
-
-    return {
-      url: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
-    };
   } catch (error) {
-    Logger.error("Receipt upload failed", error);
-    throw new Error("Failed to upload receipt");
+    console.error('Upload error:', error);
+    throw new Error('File upload failed');
   }
 }
 
 export async function deleteReceipt(publicId: string): Promise<void> {
   try {
     await cloudinary.uploader.destroy(publicId);
-    Logger.info("Receipt deleted successfully", { publicId });
   } catch (error) {
-    Logger.error("Receipt deletion failed", error);
-    throw new Error("Failed to delete receipt");
+    console.error('Delete error:', error);
+    throw new Error('File deletion failed');
   }
 }

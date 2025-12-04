@@ -1,40 +1,36 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  swcMinify: true,
   images: {
     remotePatterns: [
       {
-        protocol: "https",
-        hostname: "**.cloudinary.com",
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
   },
-  experimental: {
-    esmExternals: true,
-  },
-  headers: async () => {
-    return [
-      {
-        source: "/api/:path*",
-        headers: [
-          { key: "Content-Type", value: "application/json" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "X-XSS-Protection", value: "1; mode=block" },
-        ],
-      },
-    ];
-  },
-  redirects: async () => {
-    return [
-      {
-        source: "/",
-        destination: "/dashboard",
-        permanent: false,
-      },
-    ];
-  },
+  headers: async () => [
+    {
+      source: '/:path*',
+      headers: [
+        { key: 'X-DNS-Prefetch-Control', value: 'on' },
+        { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'X-XSS-Protection', value: '1; mode=block' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      ],
+    },
+  ],
+  redirects: async () => [
+    {
+      source: '/',
+      destination: '/dashboard',
+      permanent: false,
+    },
+  ],
 };
 
 module.exports = nextConfig;

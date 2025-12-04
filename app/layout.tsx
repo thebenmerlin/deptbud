@@ -1,13 +1,10 @@
-import type { Metadata } from "next";
-import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "next-themes";
-import { Navbar } from "@/components/layout/Navbar";
-import { Sidebar } from "@/components/layout/Sidebar";
-import "@/styles/globals.css";
+import type { Metadata } from 'next';
+import Providers from './providers';
+import '../styles/globals.css';
 
 export const metadata: Metadata = {
-  title: "Budget Portal",
-  description: "Smart Department Budget Management System",
+  title: 'Department Budget Management',
+  description: 'Smart budget management and expense analytics',
 };
 
 export default function RootLayout({
@@ -18,17 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
-        <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <div className="flex">
-              <Sidebar />
-              <main className="flex-1 flex flex-col">
-                <Navbar />
-                {children}
-              </main>
-            </div>
-          </ThemeProvider>
-        </SessionProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

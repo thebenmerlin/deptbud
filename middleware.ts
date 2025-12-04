@@ -1,68 +1,38 @@
-import { withAuth } from "next-auth/middleware";
-import { NextRequest, NextResponse } from "next/server";
+import { withAuth } from 'next-auth/middleware';
+import { NextResponse } from 'next/server';
 
 export const middleware = withAuth(
-  function middleware(req: NextRequest) {
-    const token = req.nextauth.token;
-    const pathname = req.nextUrl.pathname;
+  function middleware(req) {
+    const token = req.nextauth.token as any;
+    const isAdmin = token?.role === 'ADMIN';
+    const isHOD = token?.role === 'HOD';
 
-    // Public routes that don't require auth
-    const publicRoutes = ["/login", "/register", "/reset-password"];
-
-    // Check if route is public
-    if (publicRoutes.some((route) => pathname.startsWith(route))) {
-      // If already logged in, redirect to dashboard
-      if (token) {
-        return NextResponse.redirect(
-          new URL("/dashboard", req.nextUrl)
-        );
-      }
-      return NextResponse.next();
+    if (req.nextUrl.pathname.startsWith('/admin') && !isAdmin) {
+      return NextResponse.rewrite(new URL('/auth/unauthorized', req.url));
     }
 
-    // Protect routes based on role
-    const adminRoutes = ["/settings", "/admin"];
-    const hodRoutes = ["/expenses/approve", "/reports"];
-
-    if (adminRoutes.some((route) => pathname.startsWith(route))) {
-      if (token?.role !== "ADMIN") {
-        return NextResponse.redirect(
-          new URL("/dashboard", req.nextUrl)
-        );
-      }
-    }
-
-    if (hodRoutes.some((route) => pathname.startsWith(route))) {
-      if (!["ADMIN", "HOD"].includes(token?.role as string)) {
-        return NextResponse.redirect(
-          new URL("/dashboard", req.nextUrl)
-        );
-      }
+    if (req.nextUrl.pathname.startsWith('/reports') && !isAdmin && !isHOD) {
+      return NextResponse.rewrite(new URL('/auth/unauthorized', req.url));
     }
 
     return NextResponse.next();
   },
   {
     callbacks: {
-      authorized: ({ token }) => {
-        return !!token;
-      },
+      authorized: ({ token }) => !!token,
     },
     pages: {
-      signIn: "/login",
+      signIn: '/auth/login',
     },
   }
 );
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    '/dashboard/:path*',
+    '/budget/:path*',
+    '/expenses/:path*',
+    '/reports/:path*',
+    '/admin/:path*',
   ],
 };
