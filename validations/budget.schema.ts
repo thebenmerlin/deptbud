@@ -21,9 +21,10 @@ export const createBudgetSchema = z.object({
   departmentId: z.string().optional(),
 });
 
-export const updateBudgetSchema = createBudgetSchema.partial();
+export const updateBudgetSchema = createBudgetSchema
+  .partial()
+  .omit({ departmentId: true });
 
-// EXPORT ALIASES FOR COMPONENTS
 export const budgetSchema = createBudgetSchema;
 export const updateBudgetValidation = updateBudgetSchema;
 
