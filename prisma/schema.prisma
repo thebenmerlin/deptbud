@@ -1,167 +1,46 @@
-generator client {
-  provider = "prisma-client-js"
-}
+model CategoryBudget {
+  id       String   @id @default(uuid())
+  name     String   // instead of "category"
+  planned  Float
+  allocated Float
+  spent    Float   @default(0)
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+  budgetId String
+  budget   Budget  @relation(fields: [budgetId], references: [id])
 
-model User {
-  id             String    @id @default(cuid())
-  name           String?
-  email          String?   @unique
-  emailVerified  DateTime?
-  image          String?
-  hashedPassword String?
-  role           String    @default("staff") // admin, hod, staff
-  department     String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  deletedAt      DateTime?
+  expenses Expense[]
 
-  accounts     Account[]
-  budgets      Budget[]
-  expenses     Expense[]
-  approvals    ExpenseApproval[]
-  auditLogs    AuditLog[]
-
-  @@index([role])
-  @@index([deletedAt])
-  @@map("users")
-}
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refreshToken      String? @db.Text
-  accessToken       String? @db.Text
-  expiresAt         Int?
-  tokenType         String?
-  scope             String?
-  idToken           String? @db.Text
-  sessionState      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("accounts")
-}
-
-model Budget {
-  id          String    @id @default(cuid())
-  name        String
-  amount      Decimal   @db.Decimal(10, 2)
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expenses    Expense[]
-  
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  @@unique([userId, name])
-  @@index([userId])
-  @@index([createdAt])
-  @@index([deletedAt])
-  @@map("budgets")
-}
-
-model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  color     String?   @default("#6366f1")
-  expenses  Expense[]
-  
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@map("categories")
+  @@index([name])
+  @@map("category_budgets")
 }
 
 model Expense {
-  id          String   @id @default(cuid())
-  description String
-  amount      Decimal  @db.Decimal(10, 2)
-  date        DateTime @default(now())
-  status      String   @default("pending") // pending, approved, rejected
-  
-  budgetId    String
-  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id           String         @id @default(uuid())
+  amount       Float
+  date         DateTime
+  description  String?
+  vendor       String?
 
-  receipt     Receipt?
-  approvals   ExpenseApproval[]
+  activityType String?        // FIXED: this field didn't exist
+  rejectionReason String?     // FIXED: UI expects this
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  receiptUrl   String?
+  status       ExpenseStatus  @default(PENDING)
 
-  @@index([budgetId])
-  @@index([userId])
-  @@index([categoryId])
-  @@index([date])
+  categoryId   String
+  category     CategoryBudget @relation(fields: [categoryId], references: [id])
+
+  submittedById String
+  submittedBy   User          @relation("SubmittedExpenses", fields: [submittedById], references: [id])
+
+  approvedById  String?
+  approvedBy    User?         @relation("ApprovedExpenses", fields: [approvedById], references: [id])
+
+  logs         ExpenseLog[]
+  createdAt    DateTime       @default(now())
+
   @@index([status])
-  @@index([deletedAt])
+  @@index([submittedById])
+  @@index([approvedById])
   @@map("expenses")
-}
-
-model Receipt {
-  id        String   @id @default(cuid())
-  expenseId String   @unique
-  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  filePath  String
-  fileSize  Int
-  mimeType  String
-  
-  createdAt DateTime @default(now())
-
-  @@index([expenseId])
-  @@map("receipts")
-}
-
-model ExpenseApproval {
-  id        String   @id @default(cuid())
-  expenseId String
-  expense   Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
-  
-  approverId String
-  approver   User     @relation(fields: [approverId], references: [id])
-  
-  status    String   // approved, rejected
-  comment   String?
-  
-  createdAt DateTime @default(now())
-
-  @@unique([expenseId, approverId])
-  @@index([expenseId])
-  @@index([approverId])
-  @@map("expense_approvals")
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  action    String   // create, update, delete, approve, reject
-  entity    String   // Budget, Expense, etc.
-  entityId  String
-  changes   Json?    // Track what changed
-  
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([entityId])
-  @@index([createdAt])
-  @@map("audit_logs")
 }
