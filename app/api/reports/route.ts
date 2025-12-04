@@ -57,12 +57,12 @@ export async function GET(req: NextRequest) {
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
       fileName = `budget-${budget.id}.xlsx`;
     } else {
-      buffer = generateBudgetPDF(budget, budget.expenses, budget.categories);
+      buffer = await generateBudgetPDF(budget, budget.expenses, budget.categories);
       mimeType = "application/pdf";
       fileName = `budget-${budget.id}.pdf`;
     }
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": mimeType,
         "Content-Disposition": `attachment; filename="${fileName}"`,

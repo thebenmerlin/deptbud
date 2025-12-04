@@ -9,7 +9,7 @@ import { Logger } from "@/lib/logger";
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -21,19 +21,47 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (department) where.department = department;
+    if (department) where.departmentId = department;
     if (status) where.status = status;
 
     const [budgets, total] = await Promise.all([
       prisma.budget.findMany({
         where,
-        include: {
-          creator: { select: { name: true, email: true } },
+        select: {
+          id: true,
+          title: true,
+          fiscalYear: true,
+          proposedAmount: true,
+          allottedAmount: true,
+          status: true,
+          departmentId: true,
+          createdBy: true,
+          creator: {
+            select: {
+              name: true,
+              email: true,
+            },
+          },
           categories: {
-            include: { category: true },
+            select: {
+              id: true,
+              allocatedAmount: true,
+              spentAmount: true,
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                  color: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              expenses: true,
+            },
+          },
         },
-        _count: { select: { expenses: true } },
-        }),
         skip,
         take: limit,
         orderBy: { createdAt: "desc" },
@@ -57,7 +85,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -70,8 +98,18 @@ export async function POST(req: NextRequest) {
         createdBy: session.user.id,
       },
       include: {
-        creator: true,
-        categories: true,
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        categories: {
+          include: {
+            category: true,
+          },
+        },
       },
     });
 

@@ -24,7 +24,6 @@ export async function GET(
         category: true,
         budget: true,
         creator: { select: { name: true, email: true } },
-        approver: { select: { name: true, email: true } },
       },
     });
 
@@ -76,8 +75,7 @@ export async function PUT(
       where: { id: params.id },
       data: {
         status: data.status,
-        approvalNotes: data.approvalNotes,
-        approvedBy: session.user.id,
+        approverNote: data.approvalNotes,
       },
       include: { category: true },
     });
@@ -146,9 +144,9 @@ export async function DELETE(
     }
 
     // Delete receipt from Cloudinary if it exists
-    if (expense.receiptPublicId) {
+    if (expense.receiptUrl) {
       try {
-        await deleteReceipt(expense.receiptPublicId);
+        await deleteReceipt(expense.receiptUrl);
       } catch (err) {
         Logger.warn("Failed to delete receipt from Cloudinary");
       }

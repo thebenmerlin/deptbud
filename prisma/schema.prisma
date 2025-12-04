@@ -1,134 +1,155 @@
-generator client {
-  provider = "prisma-client-js"
-}
+// This file is a complete Prisma schema for deptbud
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
-  name          String?
   password      String
-  role          Role      @default(STAFF)
-  department    String?
-  active        Boolean   @default(true)
+  name          String?
+  image         String?
+  role          String    @default("STAFF") // ADMIN, HOD, STAFF
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  
+  // Relationships
+  budgets       Budget[]  @relation("creator")
+  expenses      Expense[] @relation("creator")
+  approvals     Expense[] @relation("approver")
+  auditLogs     AuditLog[]
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  budgets       Budget[]
-  expenses      Expense[]
-  auditLogs     AuditLog[]
-
+  @@index([departmentId])
   @@index([email])
-  @@index([role])
+}
+
+model Department {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  code      String    @unique
+  users     User[]
+  budgets   Budget[]
+  
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 model Budget {
-  id             String    @id @default(cuid())
-  title          String
-  fiscalYear     Int
-  department     String
-  proposedAmount Decimal   @db.Decimal(12, 2)
-  allottedAmount Decimal   @db.Decimal(12, 2)
-  status         BudgetStatus @default(ACTIVE)
-  creatorId      String
-  creator        User      @relation(fields: [creatorId], references: [id])
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  title            String
+  fiscalYear       String
+  proposedAmount   Float
+  allottedAmount   Float
+  status           String    @default("DRAFT") // DRAFT, ACTIVE, ARCHIVED
+  
+  department       Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  departmentId     String
+  
+  creator          User      @relation("creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdBy        String?
+  
+  categories       BudgetCategory[]
+  expenses         Expense[]
+  auditLogs        AuditLog[]
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  expenses       Expense[]
-  categories     BudgetCategory[]
-
-  @@index([creatorId])
-  @@index([fiscalYear])
-}
-
-model Category {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  description String?
-  icon      String?
-  color     String?
-  active    Boolean   @default(true)
-  createdAt DateTime  @default(now())
-
-  expenses  Expense[]
-  budgets   BudgetCategory[]
-
-  @@index([active])
-}
-
-model Expense {
-  id           String    @id @default(cuid())
-  budgetId     String
-  budget       Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  categoryId   String
-  category     Category  @relation(fields: [categoryId], references: [id])
-  vendor       String
-  amount       Decimal   @db.Decimal(10, 2)
-  description  String?
-  receiptUrl   String?
-  date         DateTime
-  status       ExpenseStatus @default(PENDING)
-  creatorId    String
-  creator      User      @relation(fields: [creatorId], references: [id])
-  approverNote String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  @@index([budgetId])
-  @@index([categoryId])
-  @@index([creatorId])
+  @@index([departmentId])
+  @@index([createdBy])
   @@index([status])
 }
 
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String?
+  color       String?
+  active      Boolean   @default(true)
+  
+  budgets     BudgetCategory[]
+  expenses    Expense[]
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
 model BudgetCategory {
-  id             String    @id @default(cuid())
-  budgetId       String
-  budget         Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-  categoryId     String
-  category       Category  @relation(fields: [categoryId], references: [id])
-  allocatedAmount Decimal  @db.Decimal(10, 2)
-  spentAmount    Decimal   @db.Decimal(10, 2) @default(0)
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(cuid())
+  budget          Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budgetId        String
+  category        Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  categoryId      String
+  allocatedAmount Float
+  spentAmount     Float     @default(0)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@unique([budgetId, categoryId])
   @@index([budgetId])
   @@index([categoryId])
 }
 
+model Expense {
+  id           String    @id @default(cuid())
+  budget       Budget    @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  budgetId     String
+  category     Category  @relation(fields: [categoryId], references: [id])
+  categoryId   String
+  
+  vendor       String
+  amount       Float
+  description  String?
+  receiptUrl   String?
+  date         DateTime
+  status       String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  creator      User      @relation("creator", fields: [createdBy], references: [id], onDelete: SetNull)
+  createdBy    String?
+  approver     User?     @relation("approver", fields: [approvedBy], references: [id], onDelete: SetNull)
+  approvedBy   String?
+  
+  auditLogs    AuditLog[]
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([budgetId])
+  @@index([categoryId])
+  @@index([createdBy])
+  @@index([approvedBy])
+  @@index([status])
+}
+
 model AuditLog {
-  id        String    @id @default(cuid())
-  action    String
-  entityType String
-  entityId  String
-  userId    String
-  user      User      @relation(fields: [userId], references: [id])
-  changes   Json?
-  createdAt DateTime  @default(now())
+  id          String    @id @default(cuid())
+  action      String    // CREATE, UPDATE, DELETE, APPROVE, REJECT
+  entityType  String    // Budget, Expense, User, etc.
+  entityId    String
+  changes     Json?
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      String?
+  budget      Budget?   @relation(fields: [budgetId], references: [id], onDelete: SetNull)
+  budgetId    String?
+  expense     Expense?  @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+  expenseId   String?
+  
+  createdAt   DateTime  @default(now())
 
   @@index([userId])
-  @@index([entityType])
+  @@index([budgetId])
+  @@index([expenseId])
   @@index([createdAt])
-}
-
-enum Role {
-  ADMIN
-  HOD
-  STAFF
-}
-
-enum BudgetStatus {
-  DRAFT
-  ACTIVE
-  ARCHIVED
-}
-
-enum ExpenseStatus {
-  PENDING
-  APPROVED
-  REJECTED
 }

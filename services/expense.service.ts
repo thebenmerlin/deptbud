@@ -14,7 +14,7 @@ export class ExpenseService {
       const monthlyData: Record<string, number> = {};
 
       expenses.forEach((exp) => {
-        const month = new Date(exp.transactionDate)
+        const month = new Date(exp.date)
           .toLocaleDateString("en-IN", {
             year: "numeric",
             month: "short",
