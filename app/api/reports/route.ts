@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       fileName = `budget-${budget.id}.pdf`;
     }
 
-    return new NextResponse(new Uint8Array(buffer), {
+    return new NextResponse(buffer, {
       headers: {
         "Content-Type": mimeType,
         "Content-Disposition": `attachment; filename="${fileName}"`,

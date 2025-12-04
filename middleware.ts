@@ -1,7 +1,9 @@
-export { auth as middleware } from "@/lib/auth";
+import { withAuth } from "next-auth/middleware";
+
+export const middleware = withAuth(function middleware(req) {
+  return;
+});
 
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/budget/:path*", "/expenses/:path*", "/dashboard/:path*"],
 };
