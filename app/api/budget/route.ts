@@ -1,96 +1,117 @@
+// app/api/budget/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { createBudgetSchema } from "@/validations/budget.schema";
-import { createAuditLog } from "@/lib/audit";
-import { Logger } from "@/lib/logger";
+import db from "@/lib/db";
+import { budgetSchema } from "@/validations/budget";
+import { z } from "zod";
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { searchParams } = new URL(req.url);
-    const department = searchParams.get("department");
-    const status = searchParams.get("status");
+    const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = 10;
+    const limit = parseInt(searchParams.get("limit") || "10");
     const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (department) where.department = department;
-    if (status) where.status = status;
-
-    const [budgets, total] = await Promise.all([
-      prisma.budget.findMany({
-        where,
-        include: {
-          creator: { select: { name: true, email: true } },
-          categories: {
-            include: { category: true },
+    const budgets = await db.budget.findMany({
+      where: {
+        department: {
+          users: {
+            some: {
+              id: session.user.id,
+            },
+          },
         },
-        _count: { select: { expenses: true } },
-        }),
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.budget.count({ where }),
-    ]);
-
-    return NextResponse.json({
-      budgets,
-      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      },
+      select: {
+        id: true,
+        title: true,
+        proposedAmount: true,
+        allottedAmount: true,
+        fiscalYear: true,
+        status: true,
+        createdAt: true,
+        category: true,
+      },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
     });
-  } catch (error) {
-    Logger.error("GET /api/budget error", error);
+
+    const total = await db.budget.count({
+      where: {
+        department: {
+          users: {
+            some: {
+              id: session.user.id,
+            },
+          },
+        },
+      },
+    });
+
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        budgets,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit),
+        },
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Budget GET error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch budgets" },
       { status: 500 }
     );
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const data = createBudgetSchema.parse(body);
+    const body = await request.json();
+    const validatedData = budgetSchema.parse(body);
 
-    const budget = await prisma.budget.create({
+    const budget = await db.budget.create({
       data: {
-        ...data,
-        createdBy: session.user.id,
+        title: validatedData.title,
+        proposedAmount: validatedData.proposedAmount,
+        allottedAmount: validatedData.allottedAmount,
+        fiscalYear: validatedData.fiscalYear,
+        departmentId: session.user.departmentId,
+        categoryId: validatedData.categoryId,
+        description: validatedData.description || null,
       },
       include: {
-        creator: true,
-        categories: true,
+        category: true,
       },
     });
 
-    await createAuditLog(
-      session.user.id,
-      "CREATE",
-      "Budget",
-      budget.id,
-      { title: budget.title, amount: budget.allottedAmount }
-    );
-
     return NextResponse.json(budget, { status: 201 });
-  } catch (error: any) {
-    Logger.error("POST /api/budget error", error);
-    if (error.name === "ZodError") {
-      return NextResponse.json({ error: error.errors }, { status: 400 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation failed", details: error.errors },
+        { status: 400 }
+      );
     }
+    console.error("Budget POST error:", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Failed to create budget" },
       { status: 500 }
     );
   }

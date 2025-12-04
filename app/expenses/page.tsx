@@ -1,128 +1,179 @@
-/ app/expenses/page.tsx
+// app/expenses/page.tsx
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/Card";
+import { DataTable } from "@/components/table/DataTable";
 import { Badge } from "@/components/shared/Badge";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { DataTable } from "@/components/table/DataTable";
-import { ColumnDef } from "@tanstack/react-table";
-import { Eye } from "lucide-react";
+import { Card } from "@/components/shared/Card";
+import { Button } from "@/components/ui/button";
 
 interface Expense {
   id: string;
-  activityName: string;
+  description: string;
   amount: number;
-  vendorName: string;
-  status: string;
-  transactionDate: string;
-  category: { name: string };
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  category: {
+    name: string;
+  };
+  budget: {
+    title: string;
+  };
+  createdAt: string;
 }
 
-const columns: ColumnDef<Expense>[] = [
-  {
-    accessorKey: "activityName",
-    header: "Activity",
-  },
-  {
-    accessorKey: "vendorName",
-    header: "Vendor",
-  },
-  {
-    accessorKey: "category.name",
-    header: "Category",
-  },
-  {
-    accessorKey: "amount",
-    header: "Amount",
-    cell: ({ row }) => `₹${row.original.amount.toLocaleString()}`,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    cell: ({ row }) => (
-      <Badge
-        variant={
-          row.original.status === "APPROVED"
-            ? "success"
-            : row.original.status === "REJECTED"
-            ? "danger"
-            : "warning"
-        }
-      >
-        {row.original.status}
-      </Badge>
-    ),
-  },
-  {
-    accessorKey: "transactionDate",
-    header: "Date",
-    cell: ({ row }) =>
-      new Date(row.original.transactionDate).toLocaleDateString(),
-  },
-  {
-    id: "actions",
-    header: "Actions",
-    cell: ({ row }) => (
-      <Link href={`/expenses/view/${row.original.id}`}>
-        <Button variant="outline" size="sm">
-          <Eye className="h-4 w-4" />
-        </Button>
-      </Link>
-    ),
-  },
-];
-
 export default function ExpensesPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
-    const fetchExpenses = async () => {
-      try {
-        const res = await fetch("/api/expenses");
-        if (res.ok) {
-          const data = await res.json();
-          setExpenses(data);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    if (status === "unauthenticated") {
+      router.push("/login");
+      return;
+    }
 
     fetchExpenses();
-  }, []);
+  }, [status, page, router]);
 
-  if (isLoading) {
+  const fetchExpenses = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(
+        `/api/expenses?page=${page}&limit=10`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch expenses");
+      }
+
+      const data = await response.json();
+      setExpenses(data.expenses);
+      setTotal(data.pagination.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "APPROVED":
+        return <Badge variant="success">{status}</Badge>;
+      case "REJECTED":
+        return <Badge variant="danger">{status}</Badge>;
+      case "PENDING":
+        return <Badge variant="warning">{status}</Badge>;
+      default:
+        return <Badge>{status}</Badge>;
+    }
+  };
+
+  if (status === "loading" || loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center">
-        <LoadingSpinner />
-      </div>
+      <Card className="border-red-200 bg-red-50 p-4">
+        <p className="text-red-800">Error: {error}</p>
+        <Button onClick={fetchExpenses} className="mt-2">
+          Try Again
+        </Button>
+      </Card>
     );
   }
 
+  const columns = [
+    {
+      header: "Description",
+      accessorKey: "description",
+    },
+    {
+      header: "Amount",
+      accessorKey: "amount",
+      cell: (info: any) => `₹${(info.getValue() as number).toFixed(2)}`,
+    },
+    {
+      header: "Category",
+      accessorKey: "category.name",
+    },
+    {
+      header: "Budget",
+      accessorKey: "budget.title",
+    },
+    {
+      header: "Status",
+      accessorKey: "status",
+      cell: (info: any) => getStatusBadge(info.getValue() as string),
+    },
+    {
+      header: "Date",
+      accessorKey: "createdAt",
+      cell: (info: any) =>
+        new Date(info.getValue() as string).toLocaleDateString(),
+    },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Expenses
-          </h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            View and manage all expenses
-          </p>
+          <h1 className="text-3xl font-bold">Expenses</h1>
+          <p className="text-gray-600">Manage and track your expenses</p>
         </div>
         <Link href="/expenses/new">
-          <Button>+ New Expense</Button>
+          <Button>Add Expense</Button>
         </Link>
       </div>
 
       <Card>
-        <DataTable columns={columns} data={expenses} title="Expense List" />
+        <div className="p-6">
+          {expenses.length === 0 ? (
+            <p className="text-center text-gray-500">No expenses found</p>
+          ) : (
+            <DataTable columns={columns} data={expenses} />
+          )}
+        </div>
       </Card>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Total: {total} expenses | Page: {page}
+        </p>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            variant="outline"
+          >
+            Previous
+          </Button>
+          <Button
+            onClick={() => setPage(page + 1)}
+            disabled={page * 10 >= total}
+            variant="outline"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,12 @@
+DATABASE_URL="postgresql://user:password@localhost:5432/budget_db"
+NEXTAUTH_SECRET=your-secret-key-here
+NEXTAUTH_URL=http://localhost:3000
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+NODE_ENV=development
+NEXT_PUBLIC_APP_URL=http://localhost:3000
