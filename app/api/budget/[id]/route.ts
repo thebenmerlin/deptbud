@@ -71,11 +71,20 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const data = updateBudgetSchema.parse(body);
+    const validatedData = updateBudgetSchema.parse(body);
+
+    // Transform validated data - only pass updatable fields
+    const updateData = {
+      ...(validatedData.title !== undefined && { title: validatedData.title }),
+      ...(validatedData.fiscalYear !== undefined && { fiscalYear: validatedData.fiscalYear }),
+      ...(validatedData.proposedAmount !== undefined && { proposedAmount: validatedData.proposedAmount }),
+      ...(validatedData.allottedAmount !== undefined && { allottedAmount: validatedData.allottedAmount }),
+      ...(validatedData.description !== undefined && { description: validatedData.description }),
+    };
 
     const updatedBudget = await prisma.budget.update({
       where: { id: params.id },
-      data,
+      data: updateData,
       include: { creator: true, categories: true },
     });
 
@@ -84,7 +93,7 @@ export async function PUT(
       "UPDATE",
       "Budget",
       params.id,
-      { changes: data }
+      { changes: validatedData }
     );
 
     return NextResponse.json(updatedBudget);

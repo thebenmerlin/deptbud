@@ -90,11 +90,28 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const data = createBudgetSchema.parse(body);
+    const validatedData = createBudgetSchema.parse(body);
 
+    // Find department by name to get departmentId
+    const dept = await prisma.department.findUnique({
+      where: { name: validatedData.department },
+    });
+
+    if (!dept) {
+      return NextResponse.json(
+        { error: "Department not found" },
+        { status: 404 }
+      );
+    }
+
+    // Transform validated data for Prisma
     const budget = await prisma.budget.create({
       data: {
-        ...data,
+        title: validatedData.title,
+        fiscalYear: validatedData.fiscalYear,
+        proposedAmount: validatedData.proposedAmount,
+        allottedAmount: validatedData.allottedAmount,
+        departmentId: dept.id,
         createdBy: session.user.id,
       },
       include: {

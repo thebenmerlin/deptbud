@@ -18,12 +18,30 @@ export const createBudgetSchema = z.object({
     .min(10000, "Minimum allotted amount is ₹10,000")
     .max(100000000, "Maximum allotted amount is ₹1 Crore"),
   description: z.string().optional(),
-  departmentId: z.string().optional(),
 });
 
-export const updateBudgetSchema = createBudgetSchema
-  .partial()
-  .omit({ departmentId: true });
+export const updateBudgetSchema = z.object({
+  title: z
+    .string()
+    .min(3, "Title must be at least 3 characters")
+    .max(100, "Title must be less than 100 characters")
+    .optional(),
+  fiscalYear: z
+    .string()
+    .regex(/^\d{4}-\d{4}$/, "Fiscal year must be in format YYYY-YYYY")
+    .optional(),
+  proposedAmount: z
+    .number()
+    .min(10000, "Minimum proposed amount is ₹10,000")
+    .max(100000000, "Maximum proposed amount is ₹1 Crore")
+    .optional(),
+  allottedAmount: z
+    .number()
+    .min(10000, "Minimum allotted amount is ₹10,000")
+    .max(100000000, "Maximum allotted amount is ₹1 Crore")
+    .optional(),
+  description: z.string().optional(),
+});
 
 export const budgetSchema = createBudgetSchema;
 export const updateBudgetValidation = updateBudgetSchema;
